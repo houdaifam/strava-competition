@@ -9,7 +9,7 @@ interface Props {
   userEmail: string;
 }
 
-const COLUMNS = ["B", "I", "N", "G"];
+const COLUMNS = ["B", "I", "N", "G", "O"];
 
 export default function BingoCard({ initialCompletionMap }: Props) {
   const [completionMap, setCompletionMap] = useState<Record<number, string>>(initialCompletionMap);
@@ -36,7 +36,7 @@ export default function BingoCard({ initialCompletionMap }: Props) {
         </div>
 
         {/* Column headers */}
-        <div className="bg-keyrus-blue grid grid-cols-4 px-4 pt-4 pb-2 gap-3">
+        <div className="bg-keyrus-blue flex justify-between px-4 pt-4 pb-2">
           {COLUMNS.map((letter) => (
             <div key={letter} className="flex justify-center">
               <span className="bg-keyrus-yellow text-black font-black text-2xl md:text-3xl italic w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center shadow-md">
