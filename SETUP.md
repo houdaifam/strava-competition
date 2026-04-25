@@ -35,14 +35,7 @@ git push -u origin main
 
 ---
 
-## Step 4 — Update Strava app callback domain
-
-1. Go to **strava.com/settings/api**
-2. Set **Authorization Callback Domain** to your Vercel domain (e.g. `keyrus-sports-bingo.vercel.app`)
-
----
-
-## Step 5 — Add env vars in Vercel
+## Step 4 — Add env vars in Vercel
 
 In your Vercel project → **Settings** → **Environment Variables**, add:
 
@@ -50,14 +43,14 @@ In your Vercel project → **Settings** → **Environment Variables**, add:
 |---|---|
 | `NEXTAUTH_URL` | `https://YOUR-APP.vercel.app` |
 | `NEXTAUTH_SECRET` | Run `openssl rand -base64 32` to generate |
-| `STRAVA_CLIENT_ID` | From strava.com/settings/api |
-| `STRAVA_CLIENT_SECRET` | From strava.com/settings/api |
+| `RESEND_API_KEY` | From resend.com → API Keys |
+| `EMAIL_FROM` | Sender address (must be verified in Resend) |
 | `DATABASE_URL` | From Step 3 (Neon) |
 | `BLOB_READ_WRITE_TOKEN` | From Step 3 (Vercel Blob) |
 
 ---
 
-## Step 6 — Deploy
+## Step 5 — Deploy
 
 Click **Deploy** in Vercel. The database table is created automatically on first login.
 
