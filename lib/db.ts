@@ -4,6 +4,23 @@ const sql = neon(process.env.DATABASE_URL!);
 
 export async function initDB() {
   await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id             TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+      name           TEXT,
+      email          TEXT UNIQUE,
+      email_verified TIMESTAMPTZ,
+      image          TEXT
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS verification_tokens (
+      identifier TEXT NOT NULL,
+      token      TEXT NOT NULL,
+      expires    TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (identifier, token)
+    )
+  `;
+  await sql`
     CREATE TABLE IF NOT EXISTS completions (
       id            SERIAL PRIMARY KEY,
       user_email    VARCHAR(255) NOT NULL,
