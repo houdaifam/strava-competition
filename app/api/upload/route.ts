@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { put } from "@vercel/blob";
 import { authOptions } from "@/lib/auth";
-import { initDB, upsertCompletion } from "@/lib/db";
+import { upsertCompletion } from "@/lib/db";
 import { BINGO_CELLS } from "@/lib/bingo-cells";
 
 export async function POST(request: NextRequest) {
@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
 
   const blob = await put(path, file, { access: "public" });
 
-  await initDB();
   await upsertCompletion(
     session.user.email,
     session.user.name || session.user.email,

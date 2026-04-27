@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { getUserCompletions, initDB } from "@/lib/db";
+import { getUserCompletions } from "@/lib/db";
 import { TOTAL_CELLS } from "@/lib/bingo-cells";
 import BingoCard from "@/components/BingoCard";
 import NavBar from "@/components/NavBar";
@@ -10,7 +10,6 @@ export default async function BingoPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/");
 
-  await initDB();
   const completions = await getUserCompletions(session.user.email);
   const completionMap: Record<number, string> = {};
   completions.forEach((c) => {
