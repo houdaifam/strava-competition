@@ -9,7 +9,6 @@ type VerificationToken = { identifier: string; token: string; expires: Date };
 
 const adapter = {
   async createVerificationToken(token: VerificationToken): Promise<VerificationToken> {
-    console.log("[auth] createVerificationToken identifier:", token.identifier, "token prefix:", token.token.slice(0, 8));
     await sql`
       INSERT INTO verification_tokens (identifier, token, expires)
       VALUES (${token.identifier}, ${token.token}, ${token.expires})
@@ -18,16 +17,16 @@ const adapter = {
     return token;
   },
   async useVerificationToken({ identifier, token }: { identifier: string; token: string }): Promise<VerificationToken | null> {
-    console.log("[auth] useVerificationToken identifier:", identifier, "token prefix:", token.slice(0, 8));
     try {
       const rows = await sql`
-        DELETE FROM verification_tokens
+        SELECT identifier, token, expires
+        FROM verification_tokens
         WHERE identifier = ${identifier} AND token = ${token}
-        RETURNING identifier, token, expires
       `;
-      console.log("[auth] useVerificationToken rows found:", rows.length);
       if (rows.length === 0) return null;
       const row = rows[0] as any;
+      // Clean up expired tokens but keep this one so it can survive gateway pre-clicks
+      await sql`DELETE FROM verification_tokens WHERE expires < NOW()`;
       return { identifier: row.identifier, token: row.token, expires: new Date(row.expires) };
     } catch (e) {
       console.error("[auth] useVerificationToken error:", e);
