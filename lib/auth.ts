@@ -1,10 +1,19 @@
 import { NextAuthOptions } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 import { neon } from "@neondatabase/serverless";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 const sql = neon(process.env.DATABASE_URL!);
-const resend = new Resend(process.env.RESEND_API_KEY!);
+
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.GMAIL_USER!,
+    pass: process.env.GMAIL_APP_PASSWORD!,
+  },
+});
 
 type DBUser = { id: string; name: string | null; email: string; emailVerified: Date | null; image: string | null };
 type VerificationToken = { identifier: string; token: string; expires: Date };
@@ -58,7 +67,7 @@ export const authOptions: NextAuthOptions = {
   providers: [
     EmailProvider({
       sendVerificationRequest: async ({ identifier, url }) => {
-        await resend.emails.send({
+        await transporter.sendMail({
           from: process.env.EMAIL_FROM!,
           to: identifier,
           subject: "Your Keyrus Sports Bingo sign-in link",
