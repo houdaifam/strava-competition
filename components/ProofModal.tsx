@@ -10,38 +10,54 @@ interface Props {
   onComplete: (cellId: number, proofUrl: string) => void;
 }
 
+function parseProofUrls(proofUrl?: string): string[] {
+  if (!proofUrl) return [];
+  try { return JSON.parse(proofUrl) as string[]; }
+  catch { return [proofUrl]; }
+}
+
 export default function ProofModal({ cell, existingProofUrl, onClose, onComplete }: Props) {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
+  const existingUrls = parseProofUrls(existingProofUrl);
+
+  const addFiles = (newFiles: File[]) => {
+    const imageFiles = newFiles.filter((f) => f.type.startsWith("image/"));
+    setFiles((prev) => [...prev, ...imageFiles]);
+    setPreviews((prev) => [...prev, ...imageFiles.map((f) => URL.createObjectURL(f))]);
     setError(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    if (selected.length) addFiles(selected);
+    e.target.value = "";
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (f?.type.startsWith("image/")) {
-      setFile(f);
-      setPreview(URL.createObjectURL(f));
-      setError(null);
-    }
+    addFiles(Array.from(e.dataTransfer.files));
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setPreviews((prev) => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleSubmit = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setUploading(true);
     setError(null);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      files.forEach((f) => formData.append("file", f));
       formData.append("cellId", String(cell.id));
 
       const res = await fetch("/api/upload", { method: "POST", body: formData });
@@ -71,43 +87,66 @@ export default function ProofModal({ cell, existingProofUrl, onClose, onComplete
 
         <div className="p-5 space-y-4">
           {/* Existing proof */}
-          {existingProofUrl && !preview && (
+          {existingUrls.length > 0 && previews.length === 0 && (
             <div>
               <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">
                 Your current proof
               </p>
-              <div className="relative w-full h-48 rounded-xl overflow-hidden">
-                <Image
-                  src={existingProofUrl}
-                  alt="Current proof"
-                  fill
-                  className="object-cover"
-                />
+              <div className={`grid gap-2 ${existingUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                {existingUrls.map((url, i) => (
+                  <div key={i} className="relative w-full h-40 rounded-xl overflow-hidden">
+                    <Image src={url} alt={`Proof ${i + 1}`} fill className="object-cover" />
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {/* Upload area */}
           <div
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => previews.length === 0 && fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center cursor-pointer hover:border-keyrus-blue transition-colors"
+            className={`border-2 border-dashed rounded-xl p-5 transition-colors ${
+              previews.length === 0
+                ? "text-center cursor-pointer hover:border-keyrus-blue border-gray-300"
+                : "border-gray-200"
+            }`}
           >
-            {preview ? (
-              <img
-                src={preview}
-                alt="Preview"
-                className="max-h-48 mx-auto rounded-lg object-cover"
-              />
+            {previews.length > 0 ? (
+              <div
+                className={`grid gap-2 ${previews.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+              >
+                {previews.map((src, i) => (
+                  <div key={i} className="relative">
+                    <img
+                      src={src}
+                      alt={`Preview ${i + 1}`}
+                      className="w-full h-32 rounded-lg object-cover"
+                    />
+                    <button
+                      onClick={() => removeFile(i)}
+                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-black/80"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center h-32 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-sm hover:border-keyrus-blue hover:text-keyrus-blue transition-colors"
+                >
+                  + Add more
+                </button>
+              </div>
             ) : (
               <>
                 <p className="text-4xl mb-2">📸</p>
                 <p className="text-gray-500 text-sm font-medium">
-                  {existingProofUrl ? "Upload a new proof photo" : "Upload your proof photo"}
+                  {existingProofUrl ? "Upload new proof photos" : "Upload your proof photos"}
                 </p>
                 <p className="text-gray-400 text-xs mt-1">
-                  Click or drag & drop · JPG, PNG, GIF · max 10 MB
+                  Click or drag & drop · multiple files · JPG, PNG, GIF · max 10 MB each
                 </p>
               </>
             )}
@@ -116,6 +155,7 @@ export default function ProofModal({ cell, existingProofUrl, onClose, onComplete
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple
             onChange={handleFileChange}
             className="hidden"
           />
@@ -134,10 +174,14 @@ export default function ProofModal({ cell, existingProofUrl, onClose, onComplete
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!file || uploading}
+              disabled={files.length === 0 || uploading}
               className="flex-1 py-3 bg-keyrus-red text-white rounded-xl font-bold disabled:opacity-40 hover:bg-red-800 transition-colors"
             >
-              {uploading ? "Uploading…" : existingProofUrl ? "Update Proof" : "Mark Complete! 🎉"}
+              {uploading
+                ? "Uploading…"
+                : existingProofUrl
+                ? "Update Proof"
+                : "Mark Complete! 🎉"}
             </button>
           </div>
         </div>

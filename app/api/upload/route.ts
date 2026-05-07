@@ -12,34 +12,43 @@ export async function POST(request: NextRequest) {
   }
 
   const formData = await request.formData();
-  const file = formData.get("file") as File | null;
+  const files = formData.getAll("file") as File[];
   const cellId = parseInt(formData.get("cellId") as string, 10);
 
-  if (!file) {
+  if (files.length === 0) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
   if (!BINGO_CELLS.find((c) => c.id === cellId)) {
     return NextResponse.json({ error: "Invalid cell" }, { status: 400 });
   }
-  if (file.size > 10 * 1024 * 1024) {
-    return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
-  }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
+
+  for (const file of files) {
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
+    }
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
+    }
   }
 
-  const ext = file.name.split(".").pop() || "jpg";
   const safeName = session.user.email.replace(/[@.]/g, "_");
-  const path = `proofs/${safeName}/${cellId}-${Date.now()}.${ext}`;
+  const urls: string[] = [];
 
-  const blob = await put(path, file, { access: "public" });
+  for (const file of files) {
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `proofs/${safeName}/${cellId}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const blob = await put(path, file, { access: "public" });
+    urls.push(blob.url);
+  }
+
+  const proofUrl = urls.length === 1 ? urls[0] : JSON.stringify(urls);
 
   await upsertCompletion(
     session.user.email,
     session.user.name || session.user.email,
     cellId,
-    blob.url
+    proofUrl
   );
 
-  return NextResponse.json({ proofUrl: blob.url });
+  return NextResponse.json({ proofUrl });
 }

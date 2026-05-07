@@ -31,6 +31,15 @@ export async function initDB() {
       UNIQUE (user_email, cell_id)
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS strava30 (
+      user_email   TEXT PRIMARY KEY,
+      user_name    TEXT,
+      photo_url    TEXT NOT NULL,
+      submitted_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at   TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
 }
 
 export async function getUserCompletions(email: string) {
@@ -75,4 +84,37 @@ export async function getLeaderboard() {
     completed_count: number;
     last_completed: string;
   }[];
+}
+
+export interface Strava30Submission {
+  user_email: string;
+  user_name: string | null;
+  photo_url: string;
+  submitted_at: string;
+  updated_at: string;
+}
+
+export async function getStrava30Submissions(): Promise<Strava30Submission[]> {
+  const rows = await sql`
+    SELECT user_email, user_name, photo_url, submitted_at, updated_at
+    FROM strava30
+    ORDER BY submitted_at DESC
+  `;
+  return rows as Strava30Submission[];
+}
+
+export async function upsertStrava30(
+  email: string,
+  name: string,
+  photoUrl: string
+): Promise<void> {
+  await sql`
+    INSERT INTO strava30 (user_email, user_name, photo_url)
+    VALUES (${email}, ${name}, ${photoUrl})
+    ON CONFLICT (user_email)
+    DO UPDATE SET
+      user_name  = ${name},
+      photo_url  = ${photoUrl},
+      updated_at = NOW()
+  `;
 }

@@ -17,6 +17,7 @@ export default function NavBar({ user }: Props) {
         {[
           { href: "/bingo", label: "My Card" },
           { href: "/leaderboard", label: "Leaderboard" },
+          { href: "/strava30", label: "The 30" },
         ].map(({ href, label }) => (
           <Link
             key={href}
