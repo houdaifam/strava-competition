@@ -16,6 +16,32 @@ function parseProofUrls(proofUrl?: string): string[] {
   catch { return [proofUrl]; }
 }
 
+function compressImage(file: File, maxPx = 1920, quality = 0.82): Promise<File> {
+  return new Promise((resolve) => {
+    const img = document.createElement("img");
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxPx || height > maxPx) {
+        if (width >= height) { height = Math.round((height * maxPx) / width); width = maxPx; }
+        else { width = Math.round((width * maxPx) / height); height = maxPx; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }) : file),
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 export default function ProofModal({ cell, existingProofUrl, onClose, onComplete }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -56,14 +82,19 @@ export default function ProofModal({ cell, existingProofUrl, onClose, onComplete
     setUploading(true);
     setError(null);
     try {
+      const compressed = await Promise.all(files.map((f) => compressImage(f)));
+
       const formData = new FormData();
-      files.forEach((f) => formData.append("file", f));
+      compressed.forEach((f) => formData.append("file", f));
       formData.append("cellId", String(cell.id));
 
       const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
+        let message = "Upload failed";
+        try { const data = await res.json(); message = data.error || message; } catch { /* non-JSON response */ }
+        throw new Error(message);
+      }
       const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || "Upload failed");
       onComplete(cell.id, data.proofUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -114,9 +145,7 @@ export default function ProofModal({ cell, existingProofUrl, onClose, onComplete
             }`}
           >
             {previews.length > 0 ? (
-              <div
-                className={`grid gap-2 ${previews.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
-              >
+              <div className={`grid gap-2 ${previews.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                 {previews.map((src, i) => (
                   <div key={i} className="relative">
                     <img
@@ -146,7 +175,7 @@ export default function ProofModal({ cell, existingProofUrl, onClose, onComplete
                   {existingProofUrl ? "Upload new proof photos" : "Upload your proof photos"}
                 </p>
                 <p className="text-gray-400 text-xs mt-1">
-                  Click or drag & drop · multiple files · JPG, PNG, GIF · max 10 MB each
+                  Click or drag & drop · multiple files · JPG, PNG
                 </p>
               </>
             )}
@@ -178,7 +207,7 @@ export default function ProofModal({ cell, existingProofUrl, onClose, onComplete
               className="flex-1 py-3 bg-keyrus-red text-white rounded-xl font-bold disabled:opacity-40 hover:bg-red-800 transition-colors"
             >
               {uploading
-                ? "Uploading…"
+                ? "Compressing & uploading…"
                 : existingProofUrl
                 ? "Update Proof"
                 : "Mark Complete! 🎉"}
